@@ -5,6 +5,11 @@
   <meta charset="utf-8" />
   <meta content="width=device-width, initial-scale=1" name="viewport" />
   <title>emojify.js</title>
+  <script>
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.register('sw.js', {scope: './'});
+    }
+  </script>
   <script src="emojify.js"></script>
   <link href="emojify-emoticons.css" rel="stylesheet" type="text/css">
   <style>
