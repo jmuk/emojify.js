@@ -24,7 +24,7 @@ function getName(header) {
 function storeToCache(cache, responses) {
     for (var name in responses) {
         var response = responses[name];
-        cache.put(new Request(key), new Response(response));
+        cache.put(new Request(name), new Response(response));
     }
 }
 
@@ -52,34 +52,6 @@ function untar(data) {
     return results;
 }
 
-function fetch(url) {
-    return new Promise(function(resolve, reject) {
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url);
-        xhr.responseType = 'arraybuffer';
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState != 4)
-                return;
-            console.log(xhr.response.byteLength);
-            resolve(xhr.response);
-        };
-        xhr.send();
-   });
-}
-
-// While overkill for this specific sample in which there is only one cache,
-// this is one best practice that can be followed in general to keep track of
-// multiple caches used by a given service worker, and keep them all versioned.
-// It maps a shorthand identifier for a cache to a specific, versioned cache name.
-
-// Note that since global state is discarded in between service worker restarts, these
-// variables will be reinitialized each time the service worker handles an event, and you
-// should not attempt to change their values inside an event handler. (Treat them as constants.)
-
-// If at any point you want to force pages that use this service worker to start using a fresh
-// cache, then increment the CACHE_VERSION value. It will kick off the service worker update
-// flow and the old cache(s) will be purged as part of the activate event handler when the
-// updated service worker is activated.
 var CACHE_VERSION = 1;
 var CURRENT_CACHES = {
   images: 'images-cache-v' + CACHE_VERSION
@@ -87,8 +59,8 @@ var CURRENT_CACHES = {
 
 self.addEventListener('install', function(event) {
   event.waitUntil(
-    cache.open(CURRENT_CACHES['images']).then(function(cache) {
-      fetch('images.tar').then(untar).then(storeToCache.bind(null, cache));
+    caches.open(CURRENT_CACHES['images']).then(function(cache) {
+      fetch('images.tar').then(function(response) { return response.arrayBuffer(); }).then(untar).then(storeToCache.bind(null, cache));
     }));
 });
 
@@ -118,24 +90,26 @@ self.addEventListener('activate', function(event) {
 self.addEventListener('fetch', function(event) {
   console.log('Handling fetch event for', event.request.url);
 
-  event.respondWith(
-    caches.open(CURRENT_CACHES['images']).then(function(cache) {
-      return cache.match(event.request).then(function(response) {
-        if (response) {
-          // If there is an entry in the cache for event.request, then response will be defined
-          // and we can just return it. Note that in this example, only font resources are cached.
-          console.log(' Found response in cache:', response);
+  if (/\/images\/.*png$/.exec(event.request.url)) {
+    event.respondWith(
+      caches.open(CURRENT_CACHES['images']).then(function(cache) {
+        return cache.match(event.request).then(function(response) {
+          if (response) {
+            // If there is an entry in the cache for event.request, then response will be defined
+            // and we can just return it. Note that in this example, only font resources are cached.
+            console.log(' Found response in cache:', response);
 
-          return response;
-        }
-      }).catch(function(error) {
-        // This catch() will handle exceptions that arise from the match() or fetch() operations.
-        // Note that a HTTP error response (e.g. 404) will NOT trigger an exception.
-        // It will return a normal response object that has the appropriate error code set.
-        console.error('  Error in fetch handler:', error);
+            return response;
+          }
+        }).catch(function(error) {
+          // This catch() will handle exceptions that arise from the match() or fetch() operations.
+          // Note that a HTTP error response (e.g. 404) will NOT trigger an exception.
+          // It will return a normal response object that has the appropriate error code set.
+          console.error('  Error in fetch handler:', error);
 
-        throw error;
-      });
-    })
-  );
+          throw error;
+        });
+      })
+    );
+  }
 });
